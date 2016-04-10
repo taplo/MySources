@@ -6,7 +6,7 @@ tmptest.py 仅供测试
 """
 import pandas as pd
 import talib
-
+import matplotlib.pyplot as plt
 
 '''
 #获得当日大单数据测试
@@ -39,14 +39,28 @@ def LoadTestData():
 
 
 if __name__ == '__main__':
-	import talib
+
 	#加载实验数据
 	dp=LoadTestData()
 
 	#CCI结果
 	ccilist=talib.CCI(dp.high.values,dp.low.values,dp.close.values,timeperiod=10)
+	#合并入数据表
+	dp['cci']=ccilist
 
-	print ccilist
+	close=dp.close
+	cci=dp.cci
 
+	#数据显示
+	close.plot()
+	cci.plot()
+
+	plt.show()
+
+	'''
+	macdlist=talib.MACD(dp.close.values,12,26,9)
+
+	print macdlist
+	'''
 
 
