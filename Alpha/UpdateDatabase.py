@@ -9,7 +9,18 @@ FileName:UpdateDatabase.py
 import tushare as ts
 import MySQLdb
 
+#测试：基础信息表导入MySql数据库
+bi=ts.get_stock_basics()
+bi=bi.sort()
+
+from sqlalchemy import create_engine
+engine = create_engine('mysql://dbuser:dbuser@127.0.0.1/test?charset=utf8')
+bi.to_sql('test',engine,if_exists='append')
+#第一次会出索引错误，需到MySQL中的表设计中修改索引字段属性为Varchar
+
 #获得数据库中目前时间状态
 
 
+
 if __name__ == '__main__':
+	pass
