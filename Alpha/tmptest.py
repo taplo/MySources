@@ -8,6 +8,7 @@ import pandas as pd
 import talib
 import matplotlib.pyplot as plt
 import MySQLdb
+import tushare as ts
 
 '''
 #获得当日大单数据测试
@@ -26,38 +27,60 @@ def GetDayData(code):
 
 #家庭笔记本测试用数据读取
 def LapTopLoad():
-	return pd.DataFrame.from_csv("c:\\users\\wangtao\\documents\\600606.csv")
+	return pd.DataFrame.from_csv("c:\\users\\wangtao\\documents\\600999.csv")
 
 #办公室台式机测试用数据读取
 def OfficeDesktopLoad():
-    #打开数据库链接
-    db=MySQLdb.connect("localhost","dbuser","dbuser","test")
-    cur=db.cursor()
-    dbCommand="select date,open,high,close,low,vol,turn from DateLine where code='%s'"%('600030')
-    try:    
-        cur.execute(dbCommand)
-        o=cur.fetchall()
-        db.close()
-        return pd.DataFrame(o)
-    except Exception as err:
-        db.close()
-        return err.message
+	#打开数据库链接
+	db=MySQLdb.connect("localhost","dbuser","dbuser","test")
+	cur=db.cursor()
+	dbCommand="select date,open,high,close,low,vol,turn from DateLine where code='%s' order by date DESC"%('600999')
+	try:    
+		cur.execute(dbCommand)
+		o=cur.fetchall()
+		#将结果转化成pandas的DataFrame数据结构
+		t1=[]
+		t2=[]
+		for i in xrange(len(o)):
+			t1.append(o[i][0])
+			t2.append(pd.Series(o[i][1:7],index=['open','high','close','low','vol','turn']))			
+		obj=pd.DataFrame(t2,index=t1)
+		obj.index.name='date'		
+	except Exception as err:
+		obj=err.message
+	finally:
+		db.close()
+		return obj
+
+#从网络获取数据
+def NetworkLoad():
+	return ts.get_h_data('600999')
 
 
 #实验数据加载函数
 def LoadTestData():
 	import os
-	hostname=os.popen('hostname').read()
-	if 'PrivateBook' in hostname:#家庭笔记本
-		return LapTopLoad()
-	else:
-		pass
+	import socket
+	try:
+		socket.gethostbyname('baidu.com')
+		return NetworkLoad()
+	except:
+		hostname=os.popen('hostname').read()
+		if 'PrivateBook' in hostname:#家庭笔记本
+			return LapTopLoad()
+		elif 'USER-20151209CR' in hostname:#办公室台式机
+			return OfficeDesktopLoad()
+		else:
+			return '数据加载错误，请手动加载！'
 
 
 if __name__ == '__main__':
 
 	#加载实验数据
 	dp=LoadTestData()
+	if len(dp)<50:
+		print dp
+		exit()
 
 	#CCI结果
 	ccilist=talib.CCI(dp.high.values,dp.low.values,dp.close.values,timeperiod=10)
