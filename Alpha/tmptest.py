@@ -7,6 +7,7 @@ tmptest.py 仅供测试
 import pandas as pd
 import talib
 import matplotlib.pyplot as plt
+import MySQLdb
 
 '''
 #获得当日大单数据测试
@@ -26,6 +27,21 @@ def GetDayData(code):
 #家庭笔记本测试用数据读取
 def LapTopLoad():
 	return pd.DataFrame.from_csv("c:\\users\\wangtao\\documents\\600606.csv")
+
+#办公室台式机测试用数据读取
+def OfficeDesktopLoad():
+    #打开数据库链接
+    db=MySQLdb.connect("localhost","dbuser","dbuser","test")
+    cur=db.cursor()
+    dbCommand="select date,open,high,close,low,vol,turn from DateLine where code='%s'"%('600030')
+    try:    
+        cur.execute(dbCommand)
+        o=cur.fetchall()
+        db.close()
+        return pd.DataFrame(o)
+    except Exception as err:
+        db.close()
+        return err.message
 
 
 #实验数据加载函数
