@@ -75,6 +75,39 @@ if __name__ == "__main__":
 '''
 
 
+'''
+#使用MultiProcessing中的线程池进行多线程应用——貌似可以突破GIL
+#可以作为模板使用
+from multiprocessing.pool import ThreadPool
+import multiprocessing
+
+#下载个股全部前复权日线数据
+def DownloadQfqAll(code,st):
+	if len(st)>2:
+		df=ts.get_h_data(code,start=st)
+		df=df.sort_index(ascending=1)
+	else:
+		df=ts.get_h_data(code)
+	print code+':'+st+' finished!'
+	return [code,df]
+
+if __name__ == "__main__":
+	#创建线程池
+	count=multiprocessing.cpu_count()
+	pool=ThreadPool(processes=count*10)
+
+	#启动线程池
+	result=[]
+	date={}
+	for i in xrange(len(lst)):
+	    result.append(pool.apply_async(DownloadQfqAll, (lst.index[i],lst[i])))
+	pool.close()
+	pool.join()
+	print "Sub-threads done."
+	for res in result:
+		t=res.get()
+		date[t[0]]=t[1]
+'''
 #多进程的进程池测试
 #今后可以作为模板使用
 
