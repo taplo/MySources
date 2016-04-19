@@ -4,23 +4,22 @@ Created on Sun Apr 17 20:34:24 2016
 
 @author: WangTao
 下载网络股票日线数据，并存入HDF5文件以备进行数据分析使用
+本程序主要用于本地已经有数据文件的情况下进行数据补全
 """
 
 import tushare as ts
 import pandas as pd
-#import talib
-#import matplotlib.pyplot as plt
+from multiprocessing.pool import ThreadPool
 import multiprocessing
-
+store=object
 
 #将上市时间的整形变量转换成符合要求的字符串变量
 def ChangeDate(i):
+	r=''	
 	if i>0:
 		s=str(i)
 		r=s[0:4]+'-'+s[4:6]+'-'+s[6:8]
-		return r
-	else:
-		return ''
+	return r
 
 #加载本地数据
 def LoadLocalData():
@@ -28,16 +27,30 @@ def LoadLocalData():
 	判断当前是哪台设备，不同的设备用不同的文件路径加载数据文件
 	"""
 	import os
+	global store
 	hostname=os.popen('hostname').read()
 
 	if 'PrivateBook' in hostname:#家庭笔记本
-		return pd.HDFStore('c:\\tmp\\save.h5',mode='a')
+		store=pd.HDFStore('c:\\tmp\\save.h5',mode='a')
 	elif 'USER-20151209CR' in hostname:#办公室台式机
-		return pd.HDFStore('d:\\my documents\\python\\save.h5',mode='a')
+		store=pd.HDFStore('d:\\my documents\\python\\save.h5',mode='a')
 	else:
-		return None
+		store=pd.HDFStore('d:\\save.h5',mode='a')
+	try:		
+		pan=store['qfqdata']
+		for i in xrange(2):
+			pan=pan.sort_index(axis=i,ascending=1)
+	except:
+		pan=pd.Panel()
+		
+	return pan
+	
+#保存本地数据
+def SaveLocalData(pan):
+	global store
+	store['qfqdata']=pan
 
-#下载个股全部前复权日线数据
+#下载个股指定日期后的前复权日线数据的单线程函数
 def DownloadQfqAll(code,st):
 	'''
 	code is stockcode in string type
@@ -49,52 +62,64 @@ def DownloadQfqAll(code,st):
 		df=ts.get_h_data(code)
 	df=df.sort_index(ascending=1)
 	print st+'finished!'
-	return df
+	return [code,df]
 
-#首次的全部数据下载
-def DownloadAllDataFirst():
 
-	#获得网络股票数据列表
-	nbi=ts.get_stock_basics()
-	nbi=nbi.sort_index(ascending=1)
-	
-	#开启多进程数据下载
+#按照列表多线程下载数据的函数
+def MultiDownload(lst):
+	#创建线程池
 	count=multiprocessing.cpu_count()
-	if count>2:
-		count=count-1
-	pool = multiprocessing.Pool(count)
-	print 'Total '+str(count)+' processings!'
-	result={}
-	for s in xrange(len(nbi)):
-	    result[nbi.index.values[s]]=pool.apply_async(DownloadQfqAll, (nbi.index.values[s],ChangeDate(nbi.ix[0,14])))
+	pool=ThreadPool(processes=count*2)
+
+	#启动线程池
+	result=[]
+	date={}
+	for i in xrange(len(lst)):
+	    result.append(pool.apply_async(DownloadQfqAll, (lst.index[i],lst[i])))
 	pool.close()
 	pool.join()
-	
-	print 'Download finished!'
+	print "多线程下载结束！"
+	for res in result:
+		try:
+			t=res.get()
+			date[t[0]]=t[1]
+		except Exception as err:
+			print err.message
 
-	#添加日线数据进入存储数据表
-	#给nbi添加一列用于存放日线数据
-	tmp=pd.Series(result)
-	nbi['qfqdata']=tmp
-	
-	return nbi
-	
+	pan=pd.Panel(date)
+	pan.sort_index(axis=0,ascending=1)
+
+	return pan
+
 
 if __name__ == '__main__':
-	'''
 	#从本地加载数据
-	store=LoadLocalData()
-	'''
+	pan=LoadLocalData()
+	
+	#获得股票列表
+	bi=ts.get_stock_basics()
+	bi=bi.sort_index(ascending=1)
+	lst=bi.timeToMarket
+	lst=lst.apply(ChangeDate)
+	
+	#补全缺失的个股
+	#获得缺失的股票列表
+	miss=lst.drop(pan.items.tolist())
+	#下载缺失股票数据
+	misspan=MultiDownload(miss)
+	#合并缺失数据
+	pan=pd.concat([pan,misspan],axis=0)
+	
+	
 
-	nbi=DownloadAllDataFirst()
-	store=pd.HDFStore('d:\\my documents\\python\\save.h5',mode='a')
-	store['BI']=nbi
+	
+	
+	
+	#保存数据文件
+	SaveLocalData(pan)
+	#关闭保存文件
+	global store
 	store.close()
-	
-	
-	
-	
-	
 	
 
 

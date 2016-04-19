@@ -39,7 +39,7 @@ def DownloadQfqAll(code,st):
 
 if __name__ == '__main__':
 
-	FileName='c:\\tmp\\save.h5'
+	FileName='d:\\my documents\\python\\save.h5'
 	#获得网络股票数据列表
 	nbi=ts.get_stock_basics()
 	nbi=nbi.sort_index(ascending=1)
@@ -48,7 +48,7 @@ if __name__ == '__main__':
 
 	#创建线程池
 	count=multiprocessing.cpu_count()
-	pool=ThreadPool(processes=count*10)
+	pool=ThreadPool(processes=count)
 
 	#启动线程池
 	result=[]
@@ -59,15 +59,18 @@ if __name__ == '__main__':
 	pool.join()
 	print "Sub-threads done."
 	for res in result:
-		t=res.get()
-		date[t[0]]=t[1]
+		try:
+			t=res.get()
+			date[t[0]]=t[1]
+		except Exception as err:
+			print err.message
 
 	data=pd.Series(date)
 	data.sort_index(ascending=1)
 	date=data.to_dict()
 	pan=pd.Panel(date)
 	store=pd.HDFStore(FileName,mode='a')
-	store['qfqdata']=pan
+	store['allqfqdata']=pan
 	store.close()
 
 
