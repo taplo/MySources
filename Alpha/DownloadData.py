@@ -11,6 +11,7 @@ import tushare as ts
 import pandas as pd
 from multiprocessing.pool import ThreadPool
 import multiprocessing
+import datetime as dt
 store=object
 
 #将上市时间的整形变量转换成符合要求的字符串变量
@@ -56,14 +57,25 @@ def DownloadQfqAll(code,st):
 	code is stockcode in string type
 	st is time to market in string 'YYYY-MM-DD' type
 	'''
-	if len(st)>2:
-		df=ts.get_h_data(code,start=st)
+	if len(st)>10:
+		df=ts.get_h_data(code,start=st,retry_count=5,pause=1)
 	else:
 		df=ts.get_h_data(code)
-	df=df.sort_index(ascending=1)
+	df=df.sort_index(ascending=1,retry_count=5,pause=1)
 	print st+'finished!'
 	return [code,df]
 
+#返回短时间更新数据的起始时间
+def UpdateDate(s):
+	#有初始时间的设置为10日前，没有的设为3日前
+	if len(s)>1:
+		day=str(dt.date.today()-dt.timedelta(days=10))
+	else:
+		day=str(dt.date.today()-dt.timedelta(days=3))
+	
+	return day
+		
+		
 
 #按照列表多线程下载数据的函数
 def MultiDownload(lst):
@@ -106,9 +118,12 @@ if __name__ == '__main__':
 	#获得缺失的股票列表
 	miss=lst.drop(pan.items.tolist())
 	#下载缺失股票数据
-	misspan=MultiDownload(miss)
-	#合并缺失数据
-	pan=pd.concat([pan,misspan],axis=0)
+	if len(miss)>0:	
+		misspan=MultiDownload(miss)
+		#合并缺失数据
+		pan=pd.concat([pan,misspan],axis=0)
+	
+	#更新日线数据
 	
 	
 

@@ -9,6 +9,7 @@ import talib
 import matplotlib.pyplot as plt
 import MySQLdb
 import tushare as ts
+from scipy import stats
 
 '''
 #获得当日大单数据测试
@@ -73,7 +74,33 @@ def LoadTestData():
 		else:
 			return '数据加载错误，请手动加载！'
 
-
+#根据整体价格分布计算每天收盘后的简单上涨概率
+def CalcSimpleUpRatio(df):
+	"参数df为个股日线数据的DataFrame类型参数。返回错误信息或增加了概率列的DataFrame数据。"
+	try:
+		df.sort_index(ascending=1)
+		lst=[100-stats.percentileofscore(df.close,f) for f in df.close]
+		df['ratio']=lst
+		return df
+	except Exception as err:
+		return err.message
+		
+#根据整体价格分布计算每天收盘后的简单上涨概率_计算全部股份
+def CalcAllSimpleUpRatio(pan):
+	"参数pan为所有日线数据的Panel类型参数，返回错误信息或以代码为索引的收盘价和上涨简单概率DataFrame数据"
+	try:	
+		pan=pan.sort_index(axis=1,ascending=1)
+		cl=pan.major_xs(pan.major_axis[-1]).ix['close']
+		cl=cl.dropna()
+		cl=cl.sort_index(ascending=1)
+		lst=[100-stats.percentileofscore(pan[i].close.dropna(),cl[i]) for i in cl.index]
+		res=pd.DataFrame(cl)
+		res['ratio']=lst
+		return res
+	except Exception as err:
+		return err.message
+	
+	
 if __name__ == '__main__':
 
 	#加载实验数据
@@ -95,6 +122,9 @@ if __name__ == '__main__':
 	cci.plot()
 
 	plt.show()
+	
+	
+	
 
 	'''
 	macdlist=talib.MACD(dp.close.values,12,26,9)

@@ -26,10 +26,10 @@ def DownloadQfqAll(code,st):
 	st is time to market in string 'YYYY-MM-DD' type
 	'''
 	if len(st)>2:
-		df=ts.get_h_data(code,start=st)
+		df=ts.get_h_data(code,start=st,retry_count=5,pause=1)
 		df=df.sort_index(ascending=1)
 	else:
-		df=ts.get_h_data(code)
+		df=ts.get_h_data(code,retry_count=5,pause=1)
 	print code+':'+st+' finished!'
 	return [code,df]
 
