@@ -36,7 +36,7 @@ def OfficeDesktopLoad():
 	db=MySQLdb.connect("localhost","dbuser","dbuser","test")
 	cur=db.cursor()
 	dbCommand="select date,open,high,close,low,vol,turn from DateLine where code='%s' order by date DESC"%('600999')
-	try:    
+	try:
 		cur.execute(dbCommand)
 		o=cur.fetchall()
 		#将结果转化成pandas的DataFrame数据结构
@@ -44,9 +44,9 @@ def OfficeDesktopLoad():
 		t2=[]
 		for i in xrange(len(o)):
 			t1.append(o[i][0])
-			t2.append(pd.Series(o[i][1:7],index=['open','high','close','low','vol','turn']))			
+			t2.append(pd.Series(o[i][1:7],index=['open','high','close','low','vol','turn']))
 		obj=pd.DataFrame(t2,index=t1)
-		obj.index.name='date'		
+		obj.index.name='date'
 	except Exception as err:
 		obj=err.message
 	finally:
@@ -84,23 +84,22 @@ def CalcSimpleUpRatio(df):
 		return df
 	except Exception as err:
 		return err.message
-		
+
 #根据整体价格分布计算每天收盘后的简单上涨概率_计算全部股份
 def CalcAllSimpleUpRatio(pan):
 	"参数pan为所有日线数据的Panel类型参数，返回错误信息或以代码为索引的收盘价和上涨简单概率DataFrame数据"
-	try:	
+	try:
 		pan=pan.sort_index(axis=1,ascending=1)
 		cl=pan.major_xs(pan.major_axis[-1]).ix['close']
 		cl=cl.dropna()
-		cl=cl.sort_index(ascending=1)
 		lst=[100-stats.percentileofscore(pan[i].close.dropna(),cl[i]) for i in cl.index]
 		res=pd.DataFrame(cl)
 		res['ratio']=lst
 		return res
 	except Exception as err:
 		return err.message
-	
-	
+
+
 if __name__ == '__main__':
 
 	#加载实验数据
@@ -122,9 +121,9 @@ if __name__ == '__main__':
 	cci.plot()
 
 	plt.show()
-	
-	
-	
+
+
+
 
 	'''
 	macdlist=talib.MACD(dp.close.values,12,26,9)
