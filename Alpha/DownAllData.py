@@ -11,7 +11,7 @@ from multiprocessing.pool import ThreadPool
 import multiprocessing
 import time
 import datetime as dt
-#import os
+import os
 
 global finished
 global total
@@ -57,32 +57,35 @@ def DownloadCqAll(code,st):
 	df=df.sort_index(axis=1)
 	return [code,df]
 
-#callback函数
-def PutResult(res):
-	global finished
-	global total
-	try:
-		if type(res)==list:
-			t=res[0]
-			finished+=1
-			#os.system('cls')
-			print 'stock:%s finished %s/%s!'%(t,finished,total)
-		else:
-			print '***',res,'***'
-	except:
-		print '***',res,'***'
-		
+
 #检查所有线程是否全部完成
 def CheckResult(result):
+	u'检查线程是否全部完成'
 	if type(result)==list and type(result[0])==multiprocessing.pool.AsyncResult:
+		lst=[]
+		lst2=[]
+		status={}
 		for res in result:
-			if res.ready()!=True:
-				return False
+			t=res.ready()
+			lst.append(t)
+			if t:
+				try:
+					lst2.append(res.successful())
+				except:
+					lst2.append(False)
+
+		status['all']=len(result)
+		status['finished']=sum(lst)
+		status['successful']=sum(lst2)
 	else:
-		return True
-	
+		status['all']=len(result)
+		status['finished']=len(result)
+		status['successful']=0
+
+	return status
+
 if __name__ == '__main__':
-	
+
 	global finished
 	global total
 	finished=0
@@ -94,27 +97,29 @@ if __name__ == '__main__':
 	lst=lst.apply(ChangeDate)
 	total=len(lst)
 
-	
 	#创建线程池
-	count=multiprocessing.cpu_count()
+	count=2*multiprocessing.cpu_count()
 	pool=ThreadPool(processes=count)
 	'''
 	#创建进程池
-	count=multiprocessing.cpu_count()
 	pool=multiprocessing.Pool(processes=count-1)
-	print 'Downloading started...'
 	'''
+	print 'Downloading started...'
 	#启动线程/进程池
 	result=[]
 	date={}
 	for i in xrange(len(lst)):
-	    result.append(pool.apply_async(DownloadQfqAll, (lst.index[i],lst[i]),callback=PutResult))
+	    result.append(pool.apply_async(DownloadQfqAll, (lst.index[i],lst[i])))
 	pool.close()
-	#while pool._state==1:
-	#while pool._inqueue.qsize()>count:
-	while CheckResult(result)!=True:
-		print u'仍有%s任务在排队中！\t %s'%(pool._inqueue.qsize(),str(dt.datetime.now()))
-		time.sleep(15)
+	status=CheckResult(result)
+	oldq=0
+	while status['finished']<status['all']:
+		if status['finished']!=oldq:
+			os.system('cls')
+			print u'\n已经完成%s/%s项下载任务！其中成功%s个！'%(status['finished'],status['all'],status['successful'])
+		time.sleep(2)
+		oldq=status['finished']
+		status=CheckResult(result)
 	pool.join()
 	print "Sub-threads done."
 	for res in result:
@@ -124,8 +129,8 @@ if __name__ == '__main__':
 		except Exception as err:
 			print err.message
 
-	del pool	
-	
+	del pool
+
 	data=pd.Series(date)
 	data.sort_index(ascending=1)
 	date=data.to_dict()
@@ -134,23 +139,33 @@ if __name__ == '__main__':
 	store=pd.HDFStore(FileName,mode='a')
 	store['qfq']=pan
 	store.close()
-	del pan	
-	
-	#下载除权数据--------------------------------------------
+	del pan
 
+	#下载除权数据--------------------------------------------
 	#创建线程池
 	pool=ThreadPool(processes=count)
+	'''
+	#创建进程池
+	pool=multiprocessing.Pool(processes=count-1)
+	'''
+	print 'Downloading started...'
 
 	#启动线程池
 	result=[]
 	date={}
 	finished=0
 	for i in xrange(len(lst)):
-	    result.append(pool.apply_async(DownloadCqAll, (lst.index[i],lst[i]),callback=PutResult))
+	    result.append(pool.apply_async(DownloadCqAll, (lst.index[i],lst[i])))
 	pool.close()
-	while CheckResult(result)!=True:
-		print u'仍有%s任务在排队中！\t %s'%(pool._inqueue.qsize(),str(dt.datetime.now()))
-		time.sleep(15)
+	status=CheckResult(result)
+	oldq=0
+	while status['finished']<status['all']:
+		if status['finished']!=oldq:
+			os.system('cls')
+			print u'\n已经完成%s/%s项下载任务！其中成功%s个！'%(status['finished'],status['all'],status['successful'])
+		time.sleep(2)
+		oldq=status['finished']
+		status=CheckResult(result)
 	pool.join()
 	print "Sub-threads done."
 	for res in result:
@@ -160,8 +175,8 @@ if __name__ == '__main__':
 		except Exception as err:
 			print err.message
 
-	del pool	
-	
+	del pool
+
 	data=pd.Series(date)
 	data.sort_index(ascending=1)
 	date=data.to_dict()
@@ -172,3 +187,4 @@ if __name__ == '__main__':
 	store.close()
 
 	print 'done!'
+	print dt.datetime.now()
