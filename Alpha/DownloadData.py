@@ -50,7 +50,7 @@ def LoadLocalData(kind):
 #保存本地数据
 def SaveLocalData(kind,pan):
 	global store
-	del store[kind]
+	#store.remove(kind)
 	store[kind]=pan
 	store.close()
 
@@ -88,7 +88,7 @@ def DownloadCqAll(code,st):
 def UpdateDate(s):
 	#判断最后一个交易日
 	wd=dt.date.today()
-	while ts.is_holiis_holiday(str(wd)):
+	while ts.is_holiday(str(wd)):
 		wd = wd-dt.timedelta(days=1)
 
 	#有初始时间的设置为10日前，没有的设为5日前
@@ -152,7 +152,10 @@ def MultiDownload(kind,lst):
 		status=CheckResult(result)
 	pool.join()
 	#print "多线程下载结束！"
-	totalStatus['Download']=u'已经完成%s/%s项下载任务！其中成功%s个！'%(status['finished'],status['all'],status['successful'])
+	if kind=='qfq':
+		totalStatus['qfqDownload']=u'已经完成%s/%s项前复权下载任务！其中成功%s个！'%(status['finished'],status['all'],status['successful'])
+	else:
+		totalStatus['cqDownload']=u'已经完成%s/%s项除权下载任务！其中成功%s个！'%(status['finished'],status['all'],status['successful'])
 	for res in result:
 		try:
 			t=res.get()
@@ -170,7 +173,7 @@ def UpdateStockData(kind,code,df):
 	u'更新个股最新数据并对清权股票数据更新。如果无需更新则返回原来的df！'
 	#判断最后一个交易日
 	wd=dt.date.today()
-	while ts.is_holiis_holiday(str(wd)):
+	while ts.is_holiday(str(wd)):
 		wd = wd-dt.timedelta(days=1)
 	lastday=pd.Timestamp(wd)
 	#对比日期
@@ -240,7 +243,7 @@ def MultiUpdate(kind,pan):
 			t=res.get()
 			date[t[0]]=t[1]
 		except Exception as err:
-			print err.message,'code:',t[0]
+			print err.message
 	data=pd.Series(date)
 	data.sort_index(ascending=1)
 	date=data.to_dict()
@@ -273,12 +276,13 @@ if __name__ == '__main__':
 	#下载缺失股票数据
 	if len(miss)>0:
 		misspan=MultiDownload('qfq',miss)
+		misspan
 		#合并缺失数据
 		pan=pd.concat([pan,misspan],axis=0)
 		pan=pan.sort_index(axis=0,ascending=1)
 	#更新日线数据
 	pan=MultiUpdate('qfq',pan)
-
+	
 	#保存数据文件
 	SaveLocalData('qfq',pan)
 
@@ -304,7 +308,8 @@ if __name__ == '__main__':
 	#---------------------------数据处理结束-------------------------------------
 	totalStatus['Endtime']=dt.datetime.now()
 
-	print u'下载情况：',totalStatus['Download']
+	print u'下载情况：',totalStatus['qfqDownload']
+	print u'         ',totalStatus['cqDownload']
 	print u'更新情况：',totalStatus['Update']
 	print u'开始时间：',totalStatus['Starttime']
 	print u'结束时间：',totalStatus['Endtime']
