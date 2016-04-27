@@ -60,13 +60,15 @@ def DownloadQfqAll(code,st):
 	code is stockcode in string type
 	st is time to market in string 'YYYY-MM-DD' type
 	'''
-	if len(st)>10:
-		df=ts.get_h_data(code,start=st,retry_count=5,pause=1)
-	else:
-		df=ts.get_h_data(code,retry_count=5,pause=1)
+	try:
+		if len(st)>10:
+			df=ts.get_h_data(code,start=st,retry_count=5,pause=1)
+		else:
+			df=ts.get_h_data(code,retry_count=5,pause=1)
+	except:
+		df=pd.DataFrame()
 	df=df.sort_index(axis=0)
 	df=df.sort_index(axis=1)
-	#print st+'finished!'
 	return [code,df]
 
 #下载个股指定日期后的除权日线数据的单线程函数
@@ -79,6 +81,7 @@ def DownloadCqAll(code,st):
 		df=ts.get_h_data(code,autype=None,start=st,retry_count=5,pause=1)
 	else:
 		df=ts.get_h_data(code,autype=None,retry_count=5,pause=1)
+
 	df=df.sort_index(axis=0)
 	df=df.sort_index(axis=1)
 	print st+'finished!'
@@ -159,9 +162,11 @@ def MultiDownload(kind,lst):
 	for res in result:
 		try:
 			t=res.get()
-			date[t[0]]=t[1]
-		except Exception as err:
-			print err.message
+			if len(t[1])>0:
+				date[t[0]]=t[1]
+		except:
+			#print err.message
+			pass
 
 	pan=pd.Panel(date)
 	pan=pan.sort_index(axis=0,ascending=1)
@@ -242,8 +247,9 @@ def MultiUpdate(kind,pan):
 		try:
 			t=res.get()
 			date[t[0]]=t[1]
-		except Exception as err:
-			print err.message
+		except:
+			#print err.message
+			pass
 	data=pd.Series(date)
 	data.sort_index(ascending=1)
 	date=data.to_dict()
@@ -282,7 +288,7 @@ if __name__ == '__main__':
 		pan=pan.sort_index(axis=0,ascending=1)
 	#更新日线数据
 	pan=MultiUpdate('qfq',pan)
-	
+
 	#保存数据文件
 	SaveLocalData('qfq',pan)
 
