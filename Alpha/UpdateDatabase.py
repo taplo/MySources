@@ -48,17 +48,21 @@ def DownloadQfqAll(code,st):
 	st is time to market in string 'YYYY-MM-DD' type
 	'''
 	try:
-		if len(st)>10:
+		if len(st)>8:
 			df=ts.get_h_data(code,start=st,retry_count=5,pause=1)
 		else:
 			df=ts.get_h_data(code,retry_count=5,pause=1)
 	except:
 		df=pd.DataFrame()
 
-	if len(df)>0:
-		df=df.sort_index(axis=0)
-		df=df.sort_index(axis=1)
-	return df
+	try:
+		if len(df)>0:
+			df=df.sort_index(axis=0)
+			return df
+		else:
+			return pd.DataFrame()
+	except:
+		return pd.DataFrame()
 
 #下载个股指定日期后的除权日线数据的单线程函数
 def DownloadCqAll(code,st):
@@ -67,41 +71,38 @@ def DownloadCqAll(code,st):
 	st is time to market in string 'YYYY-MM-DD' type
 	'''
 	try:
-		if len(st)>10:
+		if len(st)>8:
 			df=ts.get_h_data(code,autype=None,start=st,retry_count=5,pause=1)
 		else:
 			df=ts.get_h_data(code,autype=None,retry_count=5,pause=1)
 	except:
 		df=pd.DataFrame()
 
-	if len(df)>0:
-		df=df.sort_index(axis=0)
-		df=df.sort_index(axis=1)
-	return df
+	try:
+		if len(df)>0:
+			df=df.sort_index(axis=0)
+			return df
+		else:
+			return pd.DataFrame()
+	except:
+		return pd.DataFrame()
 
-#返回短时间更新数据的起始时间
-def UpdateDate(s):
-	#判断最后一个交易日
-	wd=dt.date.today()
-	while ts.is_holiday(str(wd)):
-		wd = wd-dt.timedelta(days=1)
 
-	#有初始时间的设置为10日前，没有的设为5日前
-	if len(s)>1:
-		day=str(wd-dt.timedelta(days=10))
-	else:
-		day=str(wd-dt.timedelta(days=5))
-
-	return day
 
 #检查个股日线数据的情况并更新的单线程函数
 def UpdateStockData(kind,code,df):
 	u'更新个股最新数据并对清权股票数据更新。如果无需更新则返回原来的df！'
 	#判断最后一个交易日
-	wd=dt.date.today()
+	nt=dt.datetime.now()
+	cls=dt.time(15,30)
+	if nt.time()>cls:
+		wd=dt.date.today()
+	else:
+		wd=dt.date.today()-dt.timedelta(days=1)
 	while ts.is_holiday(str(wd)):
 		wd = wd-dt.timedelta(days=1)
 	lastday=pd.Timestamp(wd)
+	downday=wd-dt.timedelta(days=10)
 	#对比日期
 	df = df.dropna()
 	df = df.sort_index(ascending=1)
@@ -109,9 +110,9 @@ def UpdateStockData(kind,code,df):
 
 	if lastday>check.name:
 		if kind=='qfq':
-			df1 = DownloadQfqAll(code,UpdateDate(str(wd)))
+			df1 = DownloadQfqAll(code,str(downday))
 		elif kind=='cq':
-			df1 = DownloadCqAll(code,UpdateDate(str(wd)))
+			df1 = DownloadCqAll(code,str(downday))
 		else:
 			df1=pd.DataFrame()
 
@@ -154,7 +155,8 @@ if __name__ == '__main__':
 	lst=lst.apply(ChangeDate)
 
 	#-----------------------前复权数据处理--------------------------------------
-	pan=pd.Panel()
+	pan=store['qfq']
+	
 	#补全缺失的个股
 	#获得缺失的股票列表
 	if len(store)>0:
@@ -162,30 +164,40 @@ if __name__ == '__main__':
 		miss=lst.drop(pan.items.tolist())
 	else:
 		miss=lst
-
+	
 	if len(miss)>0:
 		print u'需下载%s个股票的数据！'%(len(miss))
 		for i in xrange(len(miss)):
+			cout=0
 			df=DownloadQfqAll(miss.index[i],miss[i])
-			while len(df)==0:
+			while len(df)==0 and cout<2:
 				print u'下载错误，重新下载！'
 				df=DownloadQfqAll(miss.index[i],miss[i])
+				cout+=1
 			print u'已下载%s股日线数据，共计%s条！'%(miss.index[i],len(df))
-		pan[miss.index[i]]=df
+			if len(df>0):			
+				pan[miss.index[i]]=df
 		pan=pan.sort_index(axis=0)
 		print u'共下载%s个股票数据！'%(i+1)
 		totalStatus[u'前复权下载']=u'共下载%s个股票数据！'%(i+1)
 	else:
 		print u'无缺失股票数据！'
+	
 	#更新日线数据
-	for i in xrange(len(pan)):
-		pan[pan.items[i]]=UpdateStockData('qfq',pan[pan.items[i]])
-	print u'共更新%s个股票的日线数据！'%(i+1)
+	try:
+		for i in xrange(len(pan)):
+			pan[pan.items[i]]=UpdateStockData('qfq',pan.items[i],pan[pan.items[i]])
+		print u'共更新%s个股票的日线数据！'%(i+1)
+	except Exception as err:
+		print err.message
 	totalStatus[u'前复权更新']=u'共更新%s个股票的日线数据！'%(i+1)
 	#保存数据文件
+	store.remove('qfq')
+	store.flush()
 	store['qfq']=pan
 	#-----------------------除权数据处理--------------------------------------
-	pan=pd.Panel()
+	pan=store['cq']
+	
 	#补全缺失的个股
 	#获得缺失的股票列表
 	if len(store)>0:
@@ -197,25 +209,35 @@ if __name__ == '__main__':
 	if len(miss)>0:
 		print u'需下载%s个股票的数据！'%(len(miss))
 		for i in xrange(len(miss)):
+			cout=0
 			df=DownloadCqAll(miss.index[i],miss[i])
-			while len(df)==0:
+			while len(df)==0 and cout<2:
 				print u'下载错误，重新下载！'
 				df=DownloadCqAll(miss.index[i],miss[i])
+				cout+=1
 			print u'已下载%s股日线数据，共计%s条！'%(miss.index[i],len(df))
-		pan[miss.index[i]]=df
+			if len(df>0):			
+				pan[miss.index[i]]=df
 		pan=pan.sort_index(axis=0)
 		print u'共下载%s个股票数据！'%(i+1)
 		totalStatus[u'除权下载']=u'共下载%s个股票数据！'%(i+1)
 	else:
 		print u'无缺失股票数据！'
+	
 	#更新日线数据
-	for i in xrange(len(pan)):
-		pan[pan.items[i]]=UpdateStockData('qfq',pan[pan.items[i]])
-	print u'共更新%s个股票的日线数据！'%(i+1)
+	try:
+		for i in xrange(len(pan)):
+			pan[pan.items[i]]=UpdateStockData('cq',pan.items[i],pan[pan.items[i]])
+		print u'共更新%s个股票的日线数据！'%(i+1)
+	except Exception as err:
+		print err.message
 	totalStatus[u'除权更新']=u'共更新%s个股票的日线数据！'%(i+1)
 	#保存数据文件
+	store.remove('cq')
+	store.flush()
 	store['cq']=pan
-
+	store.flush()
+	store.close()
 	#------------------数据下载结束--------------------------------------------
 	totalStatus[u'结束时间']=dt.datetime.now()
 
