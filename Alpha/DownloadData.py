@@ -9,11 +9,12 @@ Created on Sun Apr 17 20:34:24 2016
 
 import tushare as ts
 import pandas as pd
-from multiprocessing.pool import ThreadPool
 import multiprocessing
+from multiprocessing.pool import ThreadPool
 import datetime as dt
 import time
-totalStatus={}
+totalStatus = {}
+lastday = pd.Timestamp.now()
 
 #将上市时间的整形变量转换成符合要求的字符串变量
 def ChangeDate(i):
@@ -22,6 +23,20 @@ def ChangeDate(i):
 		s=str(i)
 		r=s[0:4]+'-'+s[4:6]+'-'+s[6:8]
 	return r
+
+#判断最后一个交易日和更新的下载日期
+def set_lastday():
+	global lastday
+	nt=dt.datetime.now()
+	cls=dt.time(15,30)
+	if nt.time()>cls:
+		wd=dt.date.today()
+	else:
+		wd=dt.date.today()-dt.timedelta(days=1)
+	while ts.is_holiday(str(wd)):
+		wd = wd-dt.timedelta(days=1)
+	lastday=pd.Timestamp(wd)
+
 
 #加载本地数据
 def LoadLocalData():
@@ -49,13 +64,14 @@ def DownloadQfqAll(code,st):
 	'''
 	try:
 		if len(st)>8:
-			df=ts.get_h_data(code,start=st,retry_count=5,pause=1)
+			df=ts.get_h_data(code,start=st)
 		else:
-			df=ts.get_h_data(code,retry_count=5,pause=1)
+			df=ts.get_h_data(code)
+		df=df.sort_index(axis=0)
+		df=df.sort_index(axis=1)
 	except:
 		df=pd.DataFrame()
-	df=df.sort_index(axis=0)
-	df=df.sort_index(axis=1)
+		
 	return [code,df]
 
 #下载个股指定日期后的除权日线数据的单线程函数
@@ -69,11 +85,11 @@ def DownloadCqAll(code,st):
 			df=ts.get_h_data(code,autype=None,start=st,retry_count=5,pause=1)
 		else:
 			df=ts.get_h_data(code,autype=None,retry_count=5,pause=1)
+		df=df.sort_index(axis=0)
+		df=df.sort_index(axis=1)
 	except:
 		df=pd.DataFrame()
 
-	df=df.sort_index(axis=0)
-	df=df.sort_index(axis=1)
 	return [code,df]
 
 
@@ -108,7 +124,7 @@ def CheckResult(result):
 def MultiDownload(kind,lst):
 	#创建线程池
 	count=multiprocessing.cpu_count()
-	#pool=ThreadPool(processes=count)
+	#pool=ThreadPool(processes=count*2)
 	pool=multiprocessing.Pool(processes=count*2)
 
 	#启动线程池
@@ -140,18 +156,21 @@ def MultiDownload(kind,lst):
 			t=res.get()
 			if len(t[1])>0:
 				date[t[0]]=t[1]
-		except Exception as err:
-			print err.message
+		except:
+			#print err.message
 			pass
-
-	pan=pd.Panel(date)
-	pan=pan.sort_index(axis=0,ascending=1)
+	if len(date)>0:
+		pan=pd.Panel(date)
+		pan=pan.sort_index(axis=0,ascending=1)
+	else:
+		pan=pd.Panel()
 
 	return pan
 
 #检查个股日线数据的情况并更新的单线程函数
 def UpdateStockData(kind,code,df):
 	u'更新个股最新数据并对清权股票数据更新。如果无需更新则返回原来的df！'
+	'''
 	#判断最后一个交易日
 	nt=dt.datetime.now()
 	cls=dt.time(15,30)
@@ -163,28 +182,32 @@ def UpdateStockData(kind,code,df):
 		wd = wd-dt.timedelta(days=1)
 	lastday=pd.Timestamp(wd)
 	downday=wd-dt.timedelta(days=10)
+	'''
+	global lastday
 	#对比日期
 	df = df.dropna()
-	df = df.sort_index(ascending=1)
-	check = df.iloc[-1]
+	#df = df.sort_index(ascending=1)
+	check = max(df.index)
 
-	if lastday>check.name:
+	if lastday>check:
+		downday = dt.date(check.year, check.month, check.day)
+		downday = downday - dt.timedelta(days=10)
 		if kind=='qfq':
 			try:
 				tmp = DownloadQfqAll(code,str(downday))
 				df1=tmp[1]
-			except Exception as err:
-				df1=err.message+code+str(downday)
+			except:
+				df1=pd.DataFrame()
 		elif kind=='cq':
 			try:
 				tmp = DownloadCqAll(code,str(downday))
 				df1=tmp[1]
-			except Exception as err:
-				df1=err.message+code+str(downday)
+			except:
+				df1=pd.DataFrame()
 		else:
 			df1=pd.DataFrame()
 			
-		if len(df1)>0:
+		if df1.shape[0]>0:
 			#对比是否发生清权
 			dp=pd.concat([df,df1])
 			dp=dp.drop_duplicates()
@@ -195,7 +218,7 @@ def UpdateStockData(kind,code,df):
 					res = DownloadQfqAll(code,str(df.ix[0].name)[:10])
 				else:
 					res = DownloadCqAll(code,str(df.ix[0].name)[:10])
-				return res#返回重新下载的值
+				return [code,res]#返回重新下载的值
 			else:#无清权，返回更新值
 				return [code,dp]
 		else:
@@ -211,7 +234,7 @@ def MultiUpdate(kind,pan):
 	u'多线程更新股票日线数据'
 	#创建线程池
 	count=multiprocessing.cpu_count()
-	#pool=ThreadPool(processes=count)
+	#pool=ThreadPool(processes=count*2)
 	pool=multiprocessing.Pool(processes=count*2)
 	#启动线程/进程池
 	result=[]
@@ -249,20 +272,28 @@ def MultiUpdate(kind,pan):
 			t=res.get()
 			if type(t)==list:
 				date[t[0]]=t[1]
-		except Exception as err:
-			print err.message
+		except:
 			pass
-	tmppan=pd.Panel(date)
-	for s in tmppan.items.tolist():
-		pan[s]=tmppan[s]
-	pan=pan.sort_index()
-
+	
+	try:	
+		if len(date)>0:
+			tmppan=pd.Panel(date)
+			for s in tmppan.items.tolist():
+				pan[s]=tmppan[s]
+			pan=pan.sort_index()
+		else:
+			pass
+	except Exception as err:
+		print err.message
 	return pan
 
 
 if __name__ == '__main__':
 
 	totalStatus['Starttime']=dt.datetime.now()
+	
+	#设定最后一个交易日
+	set_lastday()
 
 	#获得股票列表
 	bi=ts.get_stock_basics()
@@ -295,7 +326,7 @@ if __name__ == '__main__':
 
 	#保存数据文件
 	if len(pan)>0:
-		qfqpan=pan
+		qfqpan=pan.copy()
 		
 	#------------------------------除权数据处理---------------------------------
 	#从本地加载数据
@@ -319,16 +350,12 @@ if __name__ == '__main__':
 
 	#保存数据文件
 	if len(pan)>0:
-		cqpan=pan
+		cqpan=pan.copy()
 	
 	#--------------------------结果存盘-----------------------------------------
-	#filename=store.filename
-	
-	qfqpan=store.qfq
-	
-	store.remove('qfq')
-	store.remove('cq')
-	store.flush()
+	filename=store.filename
+	store.close()
+	store=pd.HDFStore(filename,mode='w')
 	store['qfq']=qfqpan
 	store['cq']=cqpan
 	store.flush()
@@ -346,5 +373,5 @@ if __name__ == '__main__':
 	print u'结束时间：',totalStatus['Endtime']
 	print u'用时:',totalStatus['Endtime']-totalStatus['Starttime']
 
-
+	raw_input("\nPress the enter key to exit....")
 
