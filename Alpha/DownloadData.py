@@ -207,7 +207,7 @@ def UpdateStockData(kind,code,df):
 		else:
 			df1=pd.DataFrame()
 			
-		if df1.shape[0]>0:
+		if len(df)>0:
 			#对比是否发生清权
 			dp=pd.concat([df,df1])
 			dp=dp.drop_duplicates()
@@ -327,6 +327,8 @@ if __name__ == '__main__':
 	#保存数据文件
 	if len(pan)>0:
 		qfqpan=pan.copy()
+	store.qfq=qfqpan
+	store.flush()
 		
 	#------------------------------除权数据处理---------------------------------
 	#从本地加载数据
@@ -354,6 +356,8 @@ if __name__ == '__main__':
 	
 	#--------------------------结果存盘-----------------------------------------
 	filename=store.filename
+	qfqpan=store.qfq
+	store.flush()
 	store.close()
 	store=pd.HDFStore(filename,mode='w')
 	store['qfq']=qfqpan
