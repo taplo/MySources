@@ -10,7 +10,7 @@ Created on Sun Apr 17 20:34:24 2016
 import tushare as ts
 import pandas as pd
 import multiprocessing
-from multiprocessing.pool import ThreadPool
+#from multiprocessing.pool import ThreadPool
 import datetime as dt
 import time
 totalStatus = {}
@@ -52,7 +52,7 @@ def LoadLocalData():
 		store=pd.HDFStore(u'D:\\用户目录\\My Documents\\Python\\save.h5',mode='a')
 	else:
 		store=pd.HDFStore('d:\\save.h5',mode='a')
-	
+
 	return store
 
 
@@ -71,7 +71,7 @@ def DownloadQfqAll(code,st):
 		df=df.sort_index(axis=1)
 	except:
 		df=pd.DataFrame()
-		
+
 	return [code,df]
 
 #下载个股指定日期后的除权日线数据的单线程函数
@@ -206,7 +206,7 @@ def UpdateStockData(kind,code,df):
 				df1=pd.DataFrame()
 		else:
 			df1=pd.DataFrame()
-			
+
 		if len(df)>0:
 			#对比是否发生清权
 			dp=pd.concat([df,df1])
@@ -239,8 +239,8 @@ def MultiUpdate(kind,pan):
 	#启动线程/进程池
 	result=[]
 	date={}
-	
-	
+
+
 	if kind=='qfq':
 		for i in xrange(len(pan)):
 			code=pan.items[i]
@@ -274,8 +274,8 @@ def MultiUpdate(kind,pan):
 				date[t[0]]=t[1]
 		except:
 			pass
-	
-	try:	
+
+	try:
 		if len(date)>0:
 			tmppan=pd.Panel(date)
 			for s in tmppan.items.tolist():
@@ -291,7 +291,7 @@ def MultiUpdate(kind,pan):
 if __name__ == '__main__':
 
 	totalStatus['Starttime']=dt.datetime.now()
-	
+
 	#设定最后一个交易日
 	set_lastday()
 
@@ -306,12 +306,10 @@ if __name__ == '__main__':
 	store=LoadLocalData()#加载前复权数据
 	ls = store.keys()
 	if '/qfq' in ls:
-		qfqpan=store['qfq']
+		pan=store['qfq']
 	else:
-		qfqpan=pd.Panel()
+		pan=pd.Panel()
 
-	pan=qfqpan
-	
 	#补全缺失的个股
 	#获得缺失的股票列表
 	miss=lst.drop(pan.items.tolist())
@@ -326,18 +324,16 @@ if __name__ == '__main__':
 
 	#保存数据文件
 	if len(pan)>0:
-		qfqpan=pan.copy()
+		qfqpan=pan
 	store.qfq=qfqpan
 	store.flush()
-		
+	del qfqpan, pan
 	#------------------------------除权数据处理---------------------------------
 	#从本地加载数据
 	if '/cq' in ls:
-		cqpan=store['cq']
+		pan=store['cq']
 	else:
-		cqpan=pd.Panel()
-	pan=cqpan
-	
+		pan=pd.Panel()
 	#补全缺失的个股
 	#获得缺失的股票列表
 	miss=lst.drop(pan.items.tolist())
@@ -352,8 +348,8 @@ if __name__ == '__main__':
 
 	#保存数据文件
 	if len(pan)>0:
-		cqpan=pan.copy()
-	
+		cqpan=pan
+
 	#--------------------------结果存盘-----------------------------------------
 	filename=store.filename
 	qfqpan=store.qfq
@@ -362,6 +358,7 @@ if __name__ == '__main__':
 	store=pd.HDFStore(filename,mode='w')
 	store['qfq']=qfqpan
 	store['cq']=cqpan
+	store['bi']=bi
 	store.flush()
 	store.close()
 
