@@ -151,7 +151,10 @@ if __name__ == '__main__':
 
 	#获得本地数据列表
 	lst = store.keys()
-	lst.remove('/basicinfo')
+	try:
+		lst.remove('/basicinfo')
+	except:
+		pass
 
 	#生成应下载列表
 	tmplst = nlst.index.tolist()
