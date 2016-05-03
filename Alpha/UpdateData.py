@@ -11,6 +11,7 @@ import datetime as dt
 import multiprocessing
 import time
 
+
 #将上市时间的整形变量转换成符合要求的字符串变量
 def ChangeDate(i):
 	r=''
@@ -132,7 +133,7 @@ def UpdateStockData(local, q):
 		downday = check.date() - dt.timedelta(days=10)
 		df1 = ts.get_h_data(code, start = str(downday), autype = kind)
 
-		if len(df1)>0	:
+		if len(df1) > 0 and type(df1) == pd.core.frame.DataFrame:
 			#对比是否发生清权
 			dp = pd.concat([df,df1])
 			dp = dp.drop_duplicates()
@@ -141,20 +142,23 @@ def UpdateStockData(local, q):
 				#重新下载数据
 				return DownloadData(local, str(df.ix[0].name)[:10], q)
 			else:#无清权
-				dp = dp.sort_index()
-				dp = dp.sort_index(axis = 1)
-				filename = q.get()
+				if len(dp) > len(df): #未停盘				
+					dp = dp.sort_index()
+					dp = dp.sort_index(axis = 1)
+					filename = q.get()
 
-				try:
-					dp.to_hdf(filename, local)
-				except:
-					store = pd.HDFStore(filename, mode = 'a')
-					store[local] = dp
-					store.flush()
-					store.close()
+					try:
+						dp.to_hdf(filename, local)
+					except:
+						store = pd.HDFStore(filename, mode = 'a')
+						store[local] = dp
+						store.flush()
+						store.close()
 
-				q.put(filename)
-				return True
+					q.put(filename)
+					return True
+				else: #停盘，无数据更新
+					return False
 		else:
 			#无更新值
 			return False
@@ -193,7 +197,7 @@ def MultiStart(down_dict = {}):
 			status=CheckResult(result)
 		pool.join()
 		status = CheckResult(result)
-		totalStatus['个股数据下载：']=u'已经完成%s/%s项下载任务！其中成功%s个！'%(status['finished'],status['all'],status['successful'])
+		totalStatus[u'个股数据下载：']=u'已经完成%s/%s项下载任务！其中成功%s个！'%(status['finished'],status['all'],status['successful'])
 
 	else: #开始更新数据------------------------------------------
 		filename = queue.get()
@@ -216,7 +220,7 @@ def MultiStart(down_dict = {}):
 			status=CheckResult(result)
 		pool.join()
 		status = CheckResult(result)
-		totalStatus['个股数据更新：']=u'已经完成%s/%s项更新任务！其中成功%s个！'%(status['finished'],status['all'],status['successful'])
+		totalStatus[u'个股数据更新：']=u'已经完成%s/%s项更新任务！其中成功%s个！'%(status['finished'],status['all'],status['successful'])
 
 
 if __name__ == '__main__':
@@ -279,3 +283,6 @@ if __name__ == '__main__':
 
 	for d in totalStatus:
 		print d,'\t',totalStatus[d]
+	print u'耗时：\t', totalStatus[u'结束时间'] - totalStatus[u'开始时间']
+
+	raw_input(u"\n按回车键退出...")

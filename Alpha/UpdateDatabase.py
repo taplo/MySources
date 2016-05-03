@@ -9,8 +9,10 @@ FileName:UpdateDatabase.py
 import tushare as ts
 import pandas as pd
 import datetime as dt
+from sqlalchemy import create_engine
 
-
+ engine = create_engine('mysql://dbuser:dbuser@DataServer/china')
+	
 #将上市时间的整形变量转换成符合要求的字符串变量
 def ChangeDate(i):
 	r=''
