@@ -11,7 +11,20 @@ import datetime as dt
 import multiprocessing
 import time
 
+'''
+#通联数据获取
+import tushare as ts
+ts.set_token('db087ed39012466cf5a797e6a150aaaf788a103423a9ec2b172cc0e55768aed2')
 
+#获取个股信息
+mkt = ts.Market()
+df = mkt.TickRTSnapshot(securityID=‘000001.XSHE’)
+
+#获取一段时间内的日期是否为交易日，isOpen=1是交易日，isOpen=0为休市
+mt = ts.Master()
+df = mt.TradeCal(exchangeCD='XSHG', beginDate='20000101', endDate='20160430', field='calendarDate,isOpen')
+
+'''
 #将上市时间的整形变量转换成符合要求的字符串变量
 def ChangeDate(i):
 	r=''
@@ -142,7 +155,7 @@ def UpdateStockData(local, q):
 				#重新下载数据
 				return DownloadData(local, str(df.ix[0].name)[:10], q)
 			else:#无清权
-				if len(dp) > len(df): #未停盘				
+				if len(dp) > len(df): #未停盘
 					dp = dp.sort_index()
 					dp = dp.sort_index(axis = 1)
 					filename = q.get()
@@ -285,4 +298,4 @@ if __name__ == '__main__':
 		print d,'\t',totalStatus[d]
 	print u'耗时：\t', totalStatus[u'结束时间'] - totalStatus[u'开始时间']
 
-	raw_input(u"\n按回车键退出...")
+	raw_input(u'\n按回车键退出...')
