@@ -16,6 +16,9 @@ import multiprocessing
 import time
 
 
+#全局变量
+totalStatus = {}
+
 #加载本地数据
 def LoadLocalData():
 	"""
@@ -61,11 +64,24 @@ def CheckResult(result):
 	return status
 
 
-
-
-
-
-
-
 if __name__ == '__main__':
-	pass
+
+	global totalStatus
+	totalStatus['starttime'] = dt.datetime.now()
+
+	filename = LoadLocalData()
+	store = pd.HDFStore(filename, mode='r')
+	#获得本地股票列表
+	bi = store['/basicinfo']
+	bi = bi.sort_index()
+	lst = store.keys()
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	store.close()

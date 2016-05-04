@@ -69,6 +69,8 @@ def RndSleep(q, slp):
 
 
 if __name__ == '__main__':
+	
+	start_time = pd.Timestamp.now()
 
 	#生成随机数列表
 	to_slp = np.random.random(100)
@@ -117,4 +119,6 @@ if __name__ == '__main__':
 		except Exception as err:
 			print err.message
 
-
+	end_time = pd.Timestamp.now()
+	
+	print end_time - start_time

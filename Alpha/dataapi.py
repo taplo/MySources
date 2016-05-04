@@ -7,7 +7,7 @@ HTTP_AUTHORIZATION_ERROR = 401
 class Client:
     domain = 'api.wmcloud.com'
     port = 443
-    token = ''
+    token = 'db087ed39012466cf5a797e6a150aaaf788a103423a9ec2b172cc0e55768aed2'
     httpClient = None
     def __init__( self ):
         self.httpClient = httplib.HTTPSConnection(self.domain, self.port)
