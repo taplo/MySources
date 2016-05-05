@@ -14,9 +14,8 @@ import os
 
 #全局变量
 global totalStatus
-global lastday
 totalStatus = {}
-lastday = pd.Timestamp.today()
+
 
 '''
 #通联数据获取
@@ -57,7 +56,7 @@ def ChangeDate(i):
 
 #确定最后一个交易日
 def get_last_day():
-	global lastday
+	global totalStatus
 	#判断最后一个交易日
 	nt = dt.datetime.now()
 	cls = dt.time(17, 30)
@@ -67,7 +66,8 @@ def get_last_day():
 		wd = dt.date.today() - dt.timedelta(days=1)
 	while ts.is_holiday(str(wd)):
 		wd = wd-dt.timedelta(days=1)
-	lastday = pd.Timestamp(wd)
+	totalStatus['lastday'] = pd.Timestamp(wd)
+	return pd.Timestamp(wd)
 
 
 #加载本地数据
@@ -151,7 +151,9 @@ def DownloadData(local, st, q):
 #检查个股日线数据的情况并更新的单线程函数
 def UpdateStockData(local, q):
 	u'更新个股最新数据并对清权股票数据更新。如果无需更新则返回原来的df！'
-	global lastday
+	global totalStatus
+	#lastday = totalStatus['lastday']
+	lastday = get_last_day()
 	#分解基础信息
 	t = local.split('/')
 	kind = t[1]
@@ -208,7 +210,7 @@ def UpdateStockData(local, q):
 
 
 #多线程发起函数
-def MultiStart(down_dict={}):
+def MultiStart(down_dict):
 	global totalStatus
 	#创建存储句柄
 	filename = LoadLocalData()
@@ -220,11 +222,11 @@ def MultiStart(down_dict={}):
 
 	#创建线程池
 	count = multiprocessing.cpu_count()
-	pool = multiprocessing.Pool(processes=count*2)
+	pool = multiprocessing.Pool(processes=count-1)
 	#启动线程/进程池
 	result = []
 	#判断状态
-	if len(down_dict) > 0: #有个股数据缺失，下载数据------------------------------
+	if down_dict != None: #有个股数据缺失，下载数据------------------------------
 		for s in down_dict:
 			result.append(pool.apply_async(DownloadData, (s, down_dict[s], queue)))
 		pool.close()
@@ -240,11 +242,10 @@ def MultiStart(down_dict={}):
 		status = CheckResult(result)
 		totalStatus['downinfo'] = u'已经完成%s/%s项下载任务！其中成功%s个！'%(status['finished'], status['all'], status['successful'])
 	else: #开始更新数据------------------------------------------
-		filename = queue.get()
+		filename = LoadLocalData()
 		store = pd.HDFStore(filename, mode='r')
 		lst = store.keys()
 		store.close()
-		queue.put(filename)
 		if '/basicinfo' in lst:
 			lst.remove('/basicinfo')
 		for s in lst:
@@ -273,29 +274,36 @@ def MultiStart(down_dict={}):
 		except:
 			#print err.message
 			pass
-	if len(down_dict) > 0:
-		se = pd.Series(date)
-		totalStatus['download'] = se
+	
+	if down_dict != None:	
+		if len(date) > 0:
+			se = pd.Series(date)
+			totalStatus['download'] = se
+		else:
+			totalStatus['download'] = ''
 	else:
-		se = pd.Series(date)
-		totalStatus['update'] = se
+		if len(date) > 0:
+			se = pd.Series(date)
+			totalStatus['update'] = se
+		else:
+			totalStatus['update'] = ''
 
 
 
 if __name__ == '__main__':
 
 	global totalStatus
-	global lastday
 	
 	totalStatus['starttime'] = dt.datetime.now()
+	totalStatus['download'] = ''
+	totalStatus['update'] = ''
 
 	#设定最后一个交易日
 	get_last_day()
-	print lastday
 	#获得股票列表
 	nbi = ts.get_stock_basics()
 	nbi = nbi.sort_index()
-	nbi = nbi.drop(nbi[nbi.timeToMarket==0].index)
+	nbi = nbi.drop(nbi[nbi.timeToMarket==0].index) #删除未上市新股
 	nlst = nbi.timeToMarket
 	nlst = nlst.apply(ChangeDate)
 
@@ -310,6 +318,12 @@ if __name__ == '__main__':
 
 	#生成应下载列表
 	tmplst = nlst.index.tolist()
+	#去除特定股票
+	killlst = ['000033', '600710', '600732'] #黑名单——退市股
+	for s in killlst:
+		if s in tmplst:
+			tmplst.remove(s)
+	
 	down_list = []
 	for s in tmplst:
 		down_list.append('/qfq/'+s)
@@ -318,27 +332,21 @@ if __name__ == '__main__':
 
 	#-------------------------补全数据------------------------------------------
 	for s in lst:
-		down_list.remove(s)
+		if s in down_list:
+			down_list.remove(s)
 
 	if len(down_list) > 0: #有个股数据需要补全
 		down_dict = {}
 		for s in down_list:
 			down_dict[s] = nlst[s[-6:]]
-		#去除特定股票
-		killlst = ['000033', '600710', '600732']
-		for s in killlst:
-			if down_dict.has_key('/qfq/'+s):		
-				del down_dict['/qfq/'+s]
-			elif down_dict.has_key('/cq/'+s):
-				del down_dict['/cq/'+s]
 			
 		MultiStart(down_dict) #开始多线程数据补全
 
 	else:#无需个股数据补全，开始更新
-		pass
+		totalStatus['downinfo'] = u'已经完成%s/%s项下载任务！其中成功%s个！'%(0, 0, 0)
 
 	#-------------------------检查更新数据--------------------------------------
-	MultiStart() #开始多线程更新
+	MultiStart(None) #开始多线程更新
 
 	#------------------数据下载结束，本地数据处理---------------------------------
 	store = pd.HDFStore(filename, mode='a')
