@@ -15,8 +15,6 @@ import datetime as dt
 import multiprocessing
 import time
 import numpy as np
-from progressbar import ProgressBar,Percentage,SimpleProgress,Bar
-
 
 
 #全局变量
@@ -200,7 +198,7 @@ def multi_start(calender, filepath='', lst=[]):
 
         #创建线程池
         count = multiprocessing.cpu_count()
-        pool = multiprocessing.Pool(processes=count-2)
+        pool = multiprocessing.Pool(processes=count-1)
         #启动线程/进程池
         result = []
         biginfo = []
@@ -211,10 +209,12 @@ def multi_start(calender, filepath='', lst=[]):
             result.append(pool.apply_async(find_big, (code, calender, queue)))
         pool.close()
         status = check_result(result)
-        pbar = ProgressBar(widgets=[Percentage(), Bar(), SimpleProgress()], maxval=len(result)).start() #画进度条
+        oldq = 0
         while status['finished'] < status['all']:
-            time.sleep(2)
-            pbar.update(status['finished'])
+            if status['finished'] != oldq:
+                print u'已经完成%s/%s项寻找任务！其中成功%s个！'%(status['finished'], status['all'], status['successful'])
+                time.sleep(1)
+            oldq = status['finished']
             status = check_result(result)
         print u'已经完成%s/%s项寻找任务！其中成功%s个！'%(status['finished'], status['all'], status['successful'])
         pool.join()
@@ -266,7 +266,6 @@ if __name__ == '__main__':
     
     totalStatus['endtime'] = dt.datetime.now()
     #打印工作结果
-    print u'已完成！'
     print u'计算结果：', totalStatus['endinfo']
     print u'共获得%s条数据！'%(len(bigdf))
     print u'开始时间：\t', totalStatus['starttime']
